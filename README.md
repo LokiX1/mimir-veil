@@ -36,12 +36,19 @@ history.
    `<ib-guid-001>` etc.; `ibnet*` names become `fabric-net-001` etc. Bare
    `ib0`/`ib1` interface names are left as-is (generic Linux names, not
    identifying) and counted in the summary.
-4. **Hostnames** — FQDNs auto-detected -> `node-001.example.internal`,
-   `node-002.example.internal`, ... Bare short hostnames are caught via
-   `--host-pattern` regexes (e.g. `--host-pattern 'bcm-[a-z0-9-]+'`) plus
-   `ssh`/`scp`/`mosh`/`ping` targets and `user@host` contexts. Public
-   domains (`github.com`, ...), `*.cluster.local`, and file extensions
-   (`notes.md`) are allowlisted.
+4. **Hostnames** — FQDNs with a host part auto-detected ->
+   `node-001.example.internal`, `node-002.example.internal`, ... Bare
+   customer domains (exactly two labels, e.g. `bhicorp.com`) collapse to
+   the generic domain itself (`example.internal`). Bare short hostnames
+   are caught via `--host-pattern` regexes (e.g.
+   `--host-pattern 'bcm-[a-z0-9-]+'`) plus `ssh`/`scp`/`mosh`/`ping`
+   targets and `user@host` contexts. Public domains (`github.com`, ...),
+   `*.cluster.local`, and file extensions (`notes.md`) are allowlisted.
+
+After anonymizing, the output is re-scanned for surviving client-name
+matches — survivors print as `LEAK` lines on stderr with file and line
+context. Always `--dry-run` first and read the LEAK lines (if any)
+before `--out`.
 
 Passes run in an order that avoids mangling: networks, IB, hostnames, then
 client names (so an FQDN containing the client name is replaced whole).

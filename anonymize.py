@@ -19,11 +19,17 @@ Four passes:
      forms, plus fe80:: GIDs) -> <ib-guid-001> etc.; ibnet* names ->
      fabric-net-001 etc. Bare ib0/ib1 interface names are left as-is
      (generic Linux names, not identifying) and reported.
-  4. Hostnames. FQDNs auto-detected and mapped to node-001, node-002, ...
-     under a generic domain (--domain, default example.internal). Bare
-     short hostnames are caught via --host-pattern regexes plus ssh/scp
+  4. Hostnames. FQDNs with a host part auto-detected and mapped to
+     node-001, node-002, ... under a generic domain (--domain, default
+     example.internal). Bare customer domains (exactly two labels, e.g.
+     bhicorp.com) collapse to the generic domain itself. Bare short
+     hostnames are caught via --host-pattern regexes plus ssh/scp
      targets and user@host contexts. Public domains (github.com, ...),
      *.cluster.local, and file extensions (notes.md) are allowlisted.
+
+  After anonymizing, the output is re-scanned for any surviving
+  client-name matches -- survivors are reported as LEAK lines on stderr
+  with file and line context, so nothing slips through silently.
 
 Nothing is ever edited in place. Dry-run first, read the diff, then write:
 
@@ -167,6 +173,28 @@ def assign_networks(nets, base, start):
     return mapping
 
 
+def find_client_leaks(text, client_pats, replacement):
+    """Client-name matches surviving in anonymized text.
+
+    The replacement stand-in is masked first (same length, so offsets stay
+    aligned) so a client pattern that is a substring of the stand-in itself
+    -- e.g. "Mega" inside "Wayland Megacorp" -- doesn't false-positive.
+    Returns a list of (pattern, line) with the line shown as anonymized.
+    """
+    if not client_pats:
+        return []
+    mask = "\x00" * len(replacement)
+    masked = text.replace(replacement, mask)
+    leaks = []
+    for c in client_pats:
+        for m in re.finditer(re.escape(c), masked, re.IGNORECASE):
+            s = masked.rfind("\n", 0, m.start()) + 1
+            e = masked.find("\n", m.end())
+            line = text[s:e if e != -1 else len(text)].strip()
+            leaks.append((c, line.replace(mask, replacement)))
+    return leaks
+
+
 # ---------------------------------------------------------------- pass 4: hostnames
 
 def collect_hostnames(texts, extra_patterns):
@@ -205,7 +233,17 @@ def collect_hostnames(texts, extra_patterns):
 def assign_hostnames(fqdns, bare, prefix, domain):
     mapping = {}
     n = 0
+    # Bare customer domains (exactly two labels, e.g. bhicorp.com) are not
+    # nodes -- they collapse to the generic domain itself. Only FQDNs with a
+    # host part (three or more labels) become node-NNN. Distinct bare domains
+    # that collide on the generic domain are visible in --scan output.
+    hosts = []
     for fq in sorted(fqdns, key=str.lower):
+        if len(fq.split(".")) == 2:
+            mapping[fq] = domain
+        else:
+            hosts.append(fq)
+    for fq in hosts:
         n += 1
         mapping[fq] = f"{prefix}-{n:03d}.{domain}"
     # A bare occurrence of an FQDN's first label (e.g. `ssh bcm-head01`
@@ -354,8 +392,13 @@ def main():
         ap.error("need --out or --dry-run/--scan")
 
     outdir = Path(args.out) if args.out else None
+    leak_total = 0
     for rel, text in texts.items():
         new = anonymize(text)
+        for pat, line in find_client_leaks(new, client_pats, args.replacement):
+            leak_total += 1
+            print(f"LEAK {rel}: client pattern {pat!r} survives: "
+                  f"{line[:200]}", file=sys.stderr)
         if args.dry_run:
             if new != text:
                 print("\n".join(difflib.unified_diff(
@@ -384,7 +427,8 @@ def main():
           f"{len(netmap)} networks, {len(hostmap)} hostnames "
           f"({len(fqdns)} FQDN, {len(bare)} bare), "
           f"{len(guidmap)} IB GUIDs, {len(ibnetmap)} ibnet names, "
-          f"{ib_ifaces} ibN refs left as-is.",
+          f"{ib_ifaces} ibN refs left as-is, "
+          f"{leak_total} client-name leaks surviving.",
           file=sys.stderr)
     return 0
 
