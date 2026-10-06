@@ -25,7 +25,9 @@ Four passes:
      (repeatable, comma-delimited, or --domain-file) are anonymized.
      FQDNs with a host part become node-001, node-002, ... under a
      generic domain (--domain, default example.internal); a listed bare
-     domain itself (bhicorp.com) collapses to the generic domain.
+     domain itself (bhicorp.com) collapses to the generic domain, as does
+     any kept FQDN that is the parent domain of other kept FQDNs
+     (acl.eng.cdwbuilt.com above acl-bcm-hn01.acl.eng.cdwbuilt.com).
      Everything else -- Kubernetes field paths (spec.containers), Helm
      values (nfd.enabled), cluster.local -- is left alone by design.
      Bare short hostnames are still caught via --host-pattern regexes
@@ -252,13 +254,26 @@ def collect_hostnames(texts, extra_patterns, listed):
 def assign_hostnames(fqdns, bare, prefix, domain):
     mapping = {}
     n = 0
+    # A kept FQDN that is a proper parent of another kept FQDN is acting
+    # as a domain, not a host (e.g. acl.eng.cdwbuilt.com above
+    # acl-bcm-hn01.acl.eng.cdwbuilt.com) -- it collapses to the generic
+    # domain just like a bare two-label domain does.
+    lower = {}
+    for fq in fqdns:
+        lower.setdefault(fq.lower(), fq)
+    parents = set()
+    for fq in fqdns:
+        labels = fq.lower().split(".")
+        for i in range(1, len(labels)):
+            p = ".".join(labels[i:])
+            if p in lower:
+                parents.add(lower[p])
     # Bare customer domains (exactly two labels, e.g. bhicorp.com) are not
-    # nodes -- they collapse to the generic domain itself. Only FQDNs with a
-    # host part (three or more labels) become node-NNN. Distinct bare domains
-    # that collide on the generic domain are visible in --scan output.
+    # nodes either -- they collapse to the generic domain itself. Distinct
+    # domains that collide here are visible in --scan output.
     hosts = []
     for fq in sorted(fqdns, key=str.lower):
-        if len(fq.split(".")) == 2:
+        if len(fq.split(".")) == 2 or fq in parents:
             mapping[fq] = domain
         else:
             hosts.append(fq)

@@ -41,7 +41,9 @@ history — and it's the way to pass a name containing a literal comma.
    (repeatable, comma-delimited, or `--domain-file`) are anonymized.
    FQDNs with a host part become `node-001.example.internal`,
    `node-002.example.internal`, ...; a listed bare domain itself
-   (`bhicorp.com`) collapses to the generic domain (`example.internal`).
+   (`bhicorp.com`) collapses to the generic domain (`example.internal`),
+   as does any kept FQDN that is the parent domain of other kept FQDNs
+   (e.g. `acl.eng.cdwbuilt.com` above `acl-bcm-hn01.acl.eng.cdwbuilt.com`).
    Everything else — Kubernetes field paths (`spec.containers`), Helm
    values (`nfd.enabled`), `cluster.local` — is left alone by design.
    Bare short hostnames are still caught via `--host-pattern` regexes
