@@ -28,10 +28,12 @@ Four passes:
      domain itself (bhicorp.com) collapses to the generic domain, as does
      any kept FQDN that is the parent domain of other kept FQDNs
      (acl.eng.cdwbuilt.com above acl-bcm-hn01.acl.eng.cdwbuilt.com).
+     Bare short hostnames are auto-derived from anonymized FQDNs (a bare
+     acl-bcm-hn01 is the same host as its FQDN; disable with
+     --no-derive-bare), and still caught via --host-pattern regexes
+     plus ssh/scp targets and user@host contexts.
      Everything else -- Kubernetes field paths (spec.containers), Helm
      values (nfd.enabled), cluster.local -- is left alone by design.
-     Bare short hostnames are still caught via --host-pattern regexes
-     plus ssh/scp targets and user@host contexts.
 
   After anonymizing, the output is re-scanned for any surviving
   client-name matches -- survivors are reported as LEAK lines on stderr
@@ -251,8 +253,9 @@ def collect_hostnames(texts, extra_patterns, listed):
     return fqdns, bare, skipped
 
 
-def assign_hostnames(fqdns, bare, prefix, domain):
+def assign_hostnames(fqdns, bare, prefix, domain, derive_bare=True):
     mapping = {}
+    derived = set()
     n = 0
     # A kept FQDN that is a proper parent of another kept FQDN is acting
     # as a domain, not a host (e.g. acl.eng.cdwbuilt.com above
@@ -280,6 +283,17 @@ def assign_hostnames(fqdns, bare, prefix, domain):
     for fq in hosts:
         n += 1
         mapping[fq] = f"{prefix}-{n:03d}.{domain}"
+    # Auto-derive bare hostnames from anonymized FQDNs: if
+    # `acl-bcm-hn01.acl.eng.cdwbuilt.com` became a node, a bare
+    # `acl-bcm-hn01` elsewhere (cmsh commands, prose) is the same host
+    # and must not survive. Only host FQDNs (3+ labels that earned a
+    # node-NNN) contribute; tiny labels are skipped to avoid turning
+    # ordinary words into nodes. Disable with --no-derive-bare.
+    if derive_bare:
+        for fq in hosts:
+            label = fq.split(".")[0]
+            if len(label) >= 3 and re.search(r"[A-Za-z]", label):
+                derived.add(label)
     # A bare occurrence of an FQDN's first label (e.g. `ssh bcm-head01`
     # when `bcm-head01.acmewidgets.internal` exists) maps to the same node
     # short name, so it doesn't leak. Ambiguous labels (same first label
@@ -287,14 +301,14 @@ def assign_hostnames(fqdns, bare, prefix, domain):
     label_to_nodes = {}
     for fq, node in mapping.items():
         label_to_nodes.setdefault(fq.split(".")[0].lower(), set()).add(node)
-    for b in sorted(bare, key=str.lower):
+    for b in sorted(set(bare) | derived, key=str.lower):
         n += 1
         nodes = label_to_nodes.get(b.lower(), set())
         if len(nodes) == 1:
             mapping[b] = next(iter(nodes)).split(".")[0]
         else:
             mapping[b] = f"{prefix}-{n:03d}"
-    return mapping
+    return mapping, derived
 
 
 # ---------------------------------------------------------------- main
@@ -318,6 +332,10 @@ def main():
                     help="third octet to start anonymized ranges at")
     ap.add_argument("--host-pattern", action="append", default=[],
                     help="extra regex for bare hostnames, e.g. 'bcm-[a-z0-9-]+' (repeatable)")
+    ap.add_argument("--no-derive-bare", action="store_true",
+                    help="don't auto-derive bare hostnames from anonymized "
+                         "FQDNs (on by default: a bare acl-bcm-hn01 is the "
+                         "same host as acl-bcm-hn01.acl.eng.cdwbuilt.com)")
     ap.add_argument("--host-prefix", default="node",
                     help="generic hostname stem")
     ap.add_argument("--domain", default="example.internal",
@@ -398,7 +416,9 @@ def main():
     # ---- pass 4: hostnames (detect on raw text, before client replacement)
     extra = [re.compile(p) for p in args.host_pattern]
     fqdns, bare, skipped = collect_hostnames(texts.values(), extra, doms)
-    hostmap = assign_hostnames(fqdns, bare, args.host_prefix, args.domain)
+    hostmap, derived_bare = assign_hostnames(
+        fqdns, bare, args.host_prefix, args.domain,
+        derive_bare=not args.no_derive_bare)
 
     # ---- build ordered replacement list: hostnames, IB, networks, clients
     # (hostnames before client names so FQDNs containing the client name
@@ -450,7 +470,8 @@ def main():
         print(f"  ibN interface refs left as-is: {ib_ifaces}")
         print("== hostnames ==")
         for old, new in sorted(hostmap.items(), key=lambda kv: kv[1]):
-            print(f"  {new}  <- {old}")
+            tag = " [derived bare]" if old in derived_bare else ""
+            print(f"  {new}  <- {old}{tag}")
         if doms:
             print("== domains ==")
             for d in doms:

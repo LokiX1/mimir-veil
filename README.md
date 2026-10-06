@@ -44,6 +44,9 @@ history — and it's the way to pass a name containing a literal comma.
    (`bhicorp.com`) collapses to the generic domain (`example.internal`),
    as does any kept FQDN that is the parent domain of other kept FQDNs
    (e.g. `acl.eng.cdwbuilt.com` above `acl-bcm-hn01.acl.eng.cdwbuilt.com`).
+   Bare hostnames are auto-derived from anonymized FQDNs — a bare
+   `acl-bcm-hn01` in `cmsh` commands maps to the same node as its FQDN
+   (disable with `--no-derive-bare`).
    Everything else — Kubernetes field paths (`spec.containers`), Helm
    values (`nfd.enabled`), `cluster.local` — is left alone by design.
    Bare short hostnames are still caught via `--host-pattern` regexes
