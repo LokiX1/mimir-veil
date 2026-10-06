@@ -9,13 +9,13 @@ read.
 
 ```bash
 # 1. point it at the bundle, see what it would do (no changes)
-/anonymize.py --client "Acme Widgets" --scan ~/obsidian/bcm-bundle | nvim -
+./anonymize.py --client "Acme Widgets" --scan ~/obsidian/bcm-bundle | nvim -
 
 # 2. dry-run the full diff
-/anonymize.py --client "Acme Widgets" --dry-run ~/obsidian/bcm-bundle | nvim -
+./anonymize.py --client "Acme Widgets" --dry-run ~/obsidian/bcm-bundle | nvim -
 
 # 3. write the anonymized bundle
-/anonymize.py --client "Acme Widgets" --out ~/bcm-bundle-anon ~/obsidian/bcm-bundle
+./anonymize.py --client "Acme Widgets" --out ~/bcm-bundle-anon ~/obsidian/bcm-bundle
 ```
 
 `--client` is repeatable. Prefer `--client-file names.txt` (one name per
