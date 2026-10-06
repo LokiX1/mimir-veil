@@ -64,3 +64,6 @@ client names (so an FQDN containing the client name is replaced whole).
 - Binary attachments (images, PDFs, zips) are skipped — scrub those by hand.
 - `--scan` and `--dry-run` exist so you can verify before writing. Use them.
 - Nothing is ever edited in place; the source bundle is only read.
+- Filenames are anonymized with the same rules (a name is an identifier
+  too); a would-be collision aborts the run loudly instead of
+  overwriting, and the old -> new names land in `anonymize-map.json`.

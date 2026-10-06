@@ -40,6 +40,10 @@ Nothing is ever edited in place. Dry-run first, read the diff, then write:
     ./anonymize.py --client-file clients.txt --dry-run ~/obsidian/bcm-bundle | nvim -
     ./anonymize.py --client-file clients.txt --out ~/bcm-bundle-anon ~/obsidian/bcm-bundle
 
+Filenames are anonymized with the same rules (a name is an identifier
+too); if two names would collide the run aborts loudly instead of
+overwriting. The old -> new filename mapping lands in anonymize-map.json.
+
 A mapping of old -> new values is written to anonymize-map.json next to the
 output. THAT FILE CONTAINS THE REAL VALUES. Do not commit it. Ever.
 """
@@ -381,31 +385,6 @@ def main():
     fqdns, bare, skipped = collect_hostnames(texts.values(), extra, doms)
     hostmap = assign_hostnames(fqdns, bare, args.host_prefix, args.domain)
 
-    if args.scan:
-        print("== client names ==")
-        for c in client_pats:
-            n = sum(t.lower().count(c.lower()) for t in texts.values())
-            print(f"  {n:5d}  {c}")
-        print("== networks ==")
-        for old, new in sorted(netmap.items()):
-            print(f"  {old}.0/24 -> {new}.0/24 ({len(nets[old])} addrs)")
-        print("== infiniband ==")
-        for g, r in sorted(guidmap.items(), key=lambda kv: kv[1]):
-            print(f"  {r}  <- {g}")
-        for n_, r in sorted(ibnetmap.items(), key=lambda kv: kv[1]):
-            print(f"  {r}  <- {n_}")
-        print(f"  ibN interface refs left as-is: {ib_ifaces}")
-        print("== hostnames ==")
-        for old, new in sorted(hostmap.items(), key=lambda kv: kv[1]):
-            print(f"  {new}  <- {old}")
-        if doms:
-            print("== domains ==")
-            for d in doms:
-                print(f"  {args.domain}  <- {d}")
-        print(f"  ({len(skipped)} other FQDN-like tokens left alone: "
-              f"not under --domains)")
-        return 0
-
     # ---- build ordered replacement list: hostnames, IB, networks, clients
     # (hostnames before client names so FQDNs containing the client name
     # are replaced whole instead of being mangled mid-domain)
@@ -433,24 +412,73 @@ def main():
             text = rx.sub(rep, text) if isinstance(rep, str) else rx.sub(rep, text)
         return text
 
+    # ---- filenames get the same treatment: a name is an identifier too
+    renames = {}
+    for rel in texts:
+        new_rel = anonymize(rel)
+        if new_rel != rel:
+            renames[rel] = new_rel
+
+    if args.scan:
+        print("== client names ==")
+        for c in client_pats:
+            n = sum(t.lower().count(c.lower()) for t in texts.values())
+            print(f"  {n:5d}  {c}")
+        print("== networks ==")
+        for old, new in sorted(netmap.items()):
+            print(f"  {old}.0/24 -> {new}.0/24 ({len(nets[old])} addrs)")
+        print("== infiniband ==")
+        for g, r in sorted(guidmap.items(), key=lambda kv: kv[1]):
+            print(f"  {r}  <- {g}")
+        for n_, r in sorted(ibnetmap.items(), key=lambda kv: kv[1]):
+            print(f"  {r}  <- {n_}")
+        print(f"  ibN interface refs left as-is: {ib_ifaces}")
+        print("== hostnames ==")
+        for old, new in sorted(hostmap.items(), key=lambda kv: kv[1]):
+            print(f"  {new}  <- {old}")
+        if doms:
+            print("== domains ==")
+            for d in doms:
+                print(f"  {args.domain}  <- {d}")
+        print(f"  ({len(skipped)} other FQDN-like tokens left alone: "
+              f"not under --domains)")
+        print("== filenames ==")
+        if renames:
+            for old, new in sorted(renames.items()):
+                print(f"  {new}  <- {old}")
+        else:
+            print("  (none)")
+        return 0
+
     if not args.dry_run and not args.out:
         ap.error("need --out or --dry-run/--scan")
 
     outdir = Path(args.out) if args.out else None
     leak_total = 0
+    # Two phases: anonymize everything first so a filename collision is
+    # caught before anything is written (no silent overwrites).
+    results, seen = [], {}
     for rel, text in texts.items():
-        new = anonymize(text)
+        new_rel = renames.get(rel, rel)
+        if new_rel in seen:
+            print(f"ERROR: filename collision after anonymizing: "
+                  f"{seen[new_rel]!r} and {rel!r} both become {new_rel!r}. "
+                  f"Rename one source file and re-run.", file=sys.stderr)
+            return 1
+        seen[new_rel] = rel
+        results.append((rel, new_rel, anonymize(text)))
+    for rel, new_rel, new in results:
         for pat, line in find_client_leaks(new, client_pats, args.replacement):
             leak_total += 1
             print(f"LEAK {rel}: client pattern {pat!r} survives: "
                   f"{line[:200]}", file=sys.stderr)
         if args.dry_run:
-            if new != text:
+            if new != texts[rel] or new_rel != rel:
                 print("\n".join(difflib.unified_diff(
-                    text.splitlines(), new.splitlines(),
-                    fromfile=f"a/{rel}", tofile=f"b/{rel}", lineterm="")))
+                    texts[rel].splitlines(), new.splitlines(),
+                    fromfile=f"a/{rel}", tofile=f"b/{new_rel}", lineterm="")))
         else:
-            dest = outdir / rel
+            dest = outdir / new_rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(new)
 
@@ -464,6 +492,7 @@ def main():
             "hostnames": dict(sorted(hostmap.items(), key=lambda kv: kv[1])),
             "ib_guids": dict(sorted(guidmap.items(), key=lambda kv: kv[1])),
             "ib_nets": dict(sorted(ibnetmap.items(), key=lambda kv: kv[1])),
+            "renamed_files": dict(sorted(renames.items())),
         }, indent=2))
         print(f"\nWROTE {mappath} -- PRIVATE, contains real values. "
               f"Do not commit.", file=sys.stderr)
