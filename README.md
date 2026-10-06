@@ -18,9 +18,10 @@ read.
 ./anonymize.py --client "Acme Widgets" --out ~/bcm-bundle-anon ~/obsidian/bcm-bundle
 ```
 
-`--client` is repeatable. Prefer `--client-file names.txt` (one name per
+`--client` is repeatable and accepts comma-delimited lists
+(`--client "Acme, Globex"`). Prefer `--client-file names.txt` (one name per
 line, `#` comments allowed) so real customer names never land in shell
-history.
+history — and it's the way to pass a name containing a literal comma.
 
 ## The four passes
 

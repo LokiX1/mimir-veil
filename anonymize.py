@@ -5,9 +5,11 @@ your laptop. Stdlib only, no dependencies, no network, no LLM.
 
 Four passes:
 
-  1. Client / company names. --client "Acme Widgets" (repeatable) or
+  1. Client / company names. --client "Acme Widgets" (repeatable;
+     comma-delimited lists also accepted: --client "Acme, Globex") or
      --client-file names.txt (one per line -- keeps real names out of shell
-     history). Case-insensitive search-and-replace with a static stand-in
+     history; also the way to pass a name containing a literal comma).
+     Case-insensitive search-and-replace with a static stand-in
      (--replacement, default "Wayland Megacorp"). Compacted variants
      ("AcmeWidgets") are derived automatically.
   2. Networks. Every distinct IPv4 /24 found is remapped to a sequential
@@ -270,7 +272,10 @@ def main():
         description="Anonymize an Obsidian markdown bundle (4 passes).")
     ap.add_argument("inputs", nargs="+", help="files or directories to process")
     ap.add_argument("--client", action="append", default=[],
-                    help="client/company name to replace (repeatable)")
+                    help="client/company name to replace (repeatable; "
+                         "comma-delimited lists also accepted, e.g. "
+                         "'Acme, Globex'. Names containing a literal comma "
+                         "should go in --client-file instead)")
     ap.add_argument("--client-file",
                     help="file with one client name per line (avoids shell history)")
     ap.add_argument("--replacement", default="Wayland Megacorp",
@@ -306,8 +311,10 @@ def main():
         print("No text files found.", file=sys.stderr)
         return 1
 
-    # ---- client names
-    clients = list(args.client)
+    # ---- client names (repeatable --client, comma-delimited accepted)
+    clients = []
+    for c in args.client:
+        clients.extend(s.strip() for s in c.split(",") if s.strip())
     if args.client_file:
         clients += [l.strip() for l in Path(args.client_file).read_text().splitlines()
                     if l.strip() and not l.startswith("#")]
