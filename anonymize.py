@@ -21,13 +21,15 @@ Four passes:
      forms, plus fe80:: GIDs) -> <ib-guid-001> etc.; ibnet* names ->
      fabric-net-001 etc. Bare ib0/ib1 interface names are left as-is
      (generic Linux names, not identifying) and reported.
-  4. Hostnames. FQDNs with a host part auto-detected and mapped to
-     node-001, node-002, ... under a generic domain (--domain, default
-     example.internal). Bare customer domains (exactly two labels, e.g.
-     bhicorp.com) collapse to the generic domain itself. Bare short
-     hostnames are caught via --host-pattern regexes plus ssh/scp
-     targets and user@host contexts. Public domains (github.com, ...),
-     *.cluster.local, and file extensions (notes.md) are allowlisted.
+  4. Hostnames. Explicit-list driven: only FQDNs under --domains
+     (repeatable, comma-delimited, or --domain-file) are anonymized.
+     FQDNs with a host part become node-001, node-002, ... under a
+     generic domain (--domain, default example.internal); a listed bare
+     domain itself (bhicorp.com) collapses to the generic domain.
+     Everything else -- Kubernetes field paths (spec.containers), Helm
+     values (nfd.enabled), cluster.local -- is left alone by design.
+     Bare short hostnames are still caught via --host-pattern regexes
+     plus ssh/scp targets and user@host contexts.
 
   After anonymizing, the output is re-scanned for any surviving
   client-name matches -- survivors are reported as LEAK lines on stderr
@@ -199,20 +201,32 @@ def find_client_leaks(text, client_pats, replacement):
 
 # ---------------------------------------------------------------- pass 4: hostnames
 
-def collect_hostnames(texts, extra_patterns):
-    fqdns, bare = set(), set()
+def under_listed(fq, listed):
+    """True if fq is exactly, or a subdomain of, a listed customer domain."""
+    fl = fq.lower()
+    return any(fl == d or fl.endswith("." + d) for d in listed)
+
+
+def collect_hostnames(texts, extra_patterns, listed):
+    fqdns, bare, skipped = set(), set(), set()
+
+    def keep(tok):
+        if not fqdn_ok(tok):
+            return
+        if under_listed(tok, listed):
+            fqdns.add(tok)
+        else:
+            skipped.add(tok)
+
     for text in texts:
         for m in FQDN_RE.finditer(text):
-            tok = m.group(0)
-            if fqdn_ok(tok):
-                fqdns.add(tok)
+            keep(m.group(0))
         for m in SSH_RE.finditer(text):
             host = m.group(2)
             if valid_ip(host):
                 continue
             if "." in host:
-                if fqdn_ok(host):
-                    fqdns.add(host)
+                keep(host)
             elif re.search(r"[A-Za-z]", host) and len(host) > 1:
                 bare.add(host)
         for m in USER_AT_RE.finditer(text):
@@ -220,8 +234,7 @@ def collect_hostnames(texts, extra_patterns):
             if valid_ip(host) or len(host) < 2:
                 continue
             if "." in host:
-                if fqdn_ok(host):
-                    fqdns.add(host)
+                keep(host)
             elif re.search(r"[A-Za-z]", host):
                 bare.add(host)
         for pat in extra_patterns:
@@ -229,7 +242,7 @@ def collect_hostnames(texts, extra_patterns):
                 tok = m.group(0)
                 if not valid_ip(tok) and re.search(r"[A-Za-z]", tok):
                     bare.add(tok)
-    return fqdns, bare
+    return fqdns, bare, skipped
 
 
 def assign_hostnames(fqdns, bare, prefix, domain):
@@ -290,6 +303,15 @@ def main():
                     help="generic hostname stem")
     ap.add_argument("--domain", default="example.internal",
                     help="generic domain for anonymized FQDNs")
+    ap.add_argument("--domains", action="append", default=[],
+                    help="customer domains to anonymize (repeatable; "
+                         "comma-delimited also accepted, e.g. "
+                         "'bhicorp.com, promega.com'). ONLY FQDNs under "
+                         "these domains are touched -- Kubernetes field "
+                         "paths, Helm values, cluster.local and everything "
+                         "else is left alone by design.")
+    ap.add_argument("--domain-file",
+                    help="file with one domain per line (# comments allowed)")
     ap.add_argument("--out", "-o", help="output directory")
     ap.add_argument("--map", help="mapping file path (default: <out>/anonymize-map.json)")
     ap.add_argument("--dry-run", action="store_true",
@@ -326,6 +348,16 @@ def main():
             client_pats.add(compact)
     client_pats = sorted(client_pats, key=len, reverse=True)
 
+    # ---- customer domains (explicit list; only these are touched)
+    doms = []
+    for d in args.domains:
+        doms.extend(s.strip().lower() for s in d.split(",") if s.strip())
+    if args.domain_file:
+        doms += [l.strip().lower()
+                 for l in Path(args.domain_file).read_text().splitlines()
+                 if l.strip() and not l.startswith("#")]
+    doms = sorted(set(doms))
+
     # ---- pass 2: networks (detect first, on raw text)
     nets = collect_networks(texts.values())
     netmap = assign_networks(nets, args.net_base, args.net_start)
@@ -346,7 +378,7 @@ def main():
 
     # ---- pass 4: hostnames (detect on raw text, before client replacement)
     extra = [re.compile(p) for p in args.host_pattern]
-    fqdns, bare = collect_hostnames(texts.values(), extra)
+    fqdns, bare, skipped = collect_hostnames(texts.values(), extra, doms)
     hostmap = assign_hostnames(fqdns, bare, args.host_prefix, args.domain)
 
     if args.scan:
@@ -366,6 +398,12 @@ def main():
         print("== hostnames ==")
         for old, new in sorted(hostmap.items(), key=lambda kv: kv[1]):
             print(f"  {new}  <- {old}")
+        if doms:
+            print("== domains ==")
+            for d in doms:
+                print(f"  {args.domain}  <- {d}")
+        print(f"  ({len(skipped)} other FQDN-like tokens left alone: "
+              f"not under --domains)")
         return 0
 
     # ---- build ordered replacement list: hostnames, IB, networks, clients
@@ -435,7 +473,8 @@ def main():
           f"({len(fqdns)} FQDN, {len(bare)} bare), "
           f"{len(guidmap)} IB GUIDs, {len(ibnetmap)} ibnet names, "
           f"{ib_ifaces} ibN refs left as-is, "
-          f"{leak_total} client-name leaks surviving.",
+          f"{leak_total} client-name leaks surviving, "
+          f"{len(skipped)} FQDN-like tokens left alone (not under --domains).",
           file=sys.stderr)
     return 0
 

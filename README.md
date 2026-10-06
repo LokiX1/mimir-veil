@@ -9,13 +9,13 @@ read.
 
 ```bash
 # 1. point it at the bundle, see what it would do (no changes)
-./anonymize.py --client "Acme Widgets" --scan ~/obsidian/bcm-bundle | nvim -
+./anonymize.py --client "Acme Widgets" --domains "acme.com, acmewidgets.internal" --scan ~/obsidian/bcm-bundle | nvim -
 
 # 2. dry-run the full diff
-./anonymize.py --client "Acme Widgets" --dry-run ~/obsidian/bcm-bundle | nvim -
+./anonymize.py --client "Acme Widgets" --domains "acme.com, acmewidgets.internal" --dry-run ~/obsidian/bcm-bundle | nvim -
 
 # 3. write the anonymized bundle
-./anonymize.py --client "Acme Widgets" --out ~/bcm-bundle-anon ~/obsidian/bcm-bundle
+./anonymize.py --client "Acme Widgets" --domains "acme.com, acmewidgets.internal" --out ~/bcm-bundle-anon ~/obsidian/bcm-bundle
 ```
 
 `--client` is repeatable and accepts comma-delimited lists
@@ -37,14 +37,16 @@ history — and it's the way to pass a name containing a literal comma.
    `<ib-guid-001>` etc.; `ibnet*` names become `fabric-net-001` etc. Bare
    `ib0`/`ib1` interface names are left as-is (generic Linux names, not
    identifying) and counted in the summary.
-4. **Hostnames** — FQDNs with a host part auto-detected ->
-   `node-001.example.internal`, `node-002.example.internal`, ... Bare
-   customer domains (exactly two labels, e.g. `bhicorp.com`) collapse to
-   the generic domain itself (`example.internal`). Bare short hostnames
-   are caught via `--host-pattern` regexes (e.g.
-   `--host-pattern 'bcm-[a-z0-9-]+'`) plus `ssh`/`scp`/`mosh`/`ping`
-   targets and `user@host` contexts. Public domains (`github.com`, ...),
-   `*.cluster.local`, and file extensions (`notes.md`) are allowlisted.
+4. **Hostnames** — explicit-list driven: only FQDNs under `--domains`
+   (repeatable, comma-delimited, or `--domain-file`) are anonymized.
+   FQDNs with a host part become `node-001.example.internal`,
+   `node-002.example.internal`, ...; a listed bare domain itself
+   (`bhicorp.com`) collapses to the generic domain (`example.internal`).
+   Everything else — Kubernetes field paths (`spec.containers`), Helm
+   values (`nfd.enabled`), `cluster.local` — is left alone by design.
+   Bare short hostnames are still caught via `--host-pattern` regexes
+   (e.g. `--host-pattern 'bcm-[a-z0-9-]+'`) plus `ssh`/`scp`/`mosh`/`ping`
+   targets and `user@host` contexts.
 
 After anonymizing, the output is re-scanned for surviving client-name
 matches — survivors print as `LEAK` lines on stderr with file and line
