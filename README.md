@@ -5,6 +5,8 @@ before it leaves your laptop. Stdlib-only Python — no dependencies, no
 network, no LLM. Read `anonymize.py` before running it; it's meant to be
 read.
 
+![Mimir's Veil — nothing real crosses](veil-flow.svg)
+
 ## Quickstart
 
 ```bash

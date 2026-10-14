@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" font-family="DejaVu Sans, 'Liberation Sans', sans-serif">
+<rect x="0" y="0" width="1400" height="800" fill="#ffffff"/>
+<text x="700" y="52" font-size="30" fill="#1a1a2e" font-weight="bold" text-anchor="middle">Mimir&#x27;s Veil — nothing real crosses</text>
+<text x="700" y="84" font-size="16" fill="#555" text-anchor="middle">runbook-anonymizer: deterministic · stdlib-only Python · no network · no LLM</text>
+<rect x="40" y="130" width="350" height="330" rx="10" fill="#fdecea" stroke="#b03a2e" stroke-width="2"/>
+<text x="215" y="168" font-size="16" fill="#7b241c" font-weight="bold" text-anchor="middle">CLIENT BUNDLE — AS WRITTEN</text>
+<text x="65" y="215" font-size="15" fill="#222" text-anchor="start">•  Real client names</text>
+<text x="65" y="249" font-size="15" fill="#222" text-anchor="start">•  Real networks — 10.200.14.5</text>
+<text x="65" y="283" font-size="15" fill="#222" text-anchor="start">•  IB GUIDs — 0x7c8c…, fe80::…</text>
+<text x="65" y="317" font-size="15" fill="#222" text-anchor="start">•  Hostnames — bcm-hn01.acme.com</text>
+<text x="65" y="351" font-size="15" fill="#222" text-anchor="start">•  Filenames carry names too</text>
+<text x="65" y="420" font-size="14" fill="#666" font-style="italic" text-anchor="start">An Obsidian-style markdown</text>
+<text x="65" y="442" font-size="14" fill="#666" font-style="italic" text-anchor="start">bundle, exactly as it left site.</text>
+<line x1="390" y1="295" x2="455" y2="295" stroke="#444" stroke-width="2.5"/>
+<polygon points="465,295 453,289 453,301" fill="#444"/>
+<text x="427" y="281" font-size="13" fill="#555" font-style="italic" text-anchor="middle">dry-run</text>
+<rect x="465" y="130" width="470" height="330" rx="10" fill="#f4effc" stroke="#6c3483" stroke-width="3"/>
+<path d="M 483 146 c 10 40, -10 80, 0 120 c -10 40, 10 80, 0 118" fill="none" stroke="#a569bd" stroke-width="2" opacity="0.55"/>
+<path d="M 917 146 c 10 40, -10 80, 0 120 c -10 40, 10 80, 0 118" fill="none" stroke="#a569bd" stroke-width="2" opacity="0.55"/>
+<text x="700" y="168" font-size="17" fill="#4a235a" font-weight="bold" text-anchor="middle">anonymize.py — FOUR PASSES</text>
+<rect x="500" y="186" width="400" height="54" rx="8" fill="#ffffff" stroke="#a569bd" stroke-width="1.2"/>
+<text x="514" y="208" font-size="14.5" fill="#4a235a" font-weight="bold" text-anchor="start">1 · Networks</text>
+<text x="514" y="230" font-size="12.5" fill="#333" text-anchor="start">every /24 → 10.10.x.0/24 sequence · host octets kept</text>
+<rect x="500" y="248" width="400" height="54" rx="8" fill="#ffffff" stroke="#a569bd" stroke-width="1.2"/>
+<text x="514" y="270" font-size="14.5" fill="#4a235a" font-weight="bold" text-anchor="start">2 · InfiniBand</text>
+<text x="514" y="292" font-size="12.5" fill="#333" text-anchor="start">GUIDs → &lt;ib-guid-001&gt; · ibnets → fabric-net-001</text>
+<rect x="500" y="310" width="400" height="54" rx="8" fill="#ffffff" stroke="#a569bd" stroke-width="1.2"/>
+<text x="514" y="332" font-size="14.5" fill="#4a235a" font-weight="bold" text-anchor="start">3 · Hostnames</text>
+<text x="514" y="354" font-size="12.5" fill="#333" text-anchor="start">FQDNs → node-001.example.internal</text>
+<rect x="500" y="372" width="400" height="54" rx="8" fill="#ffffff" stroke="#a569bd" stroke-width="1.2"/>
+<text x="514" y="394" font-size="14.5" fill="#4a235a" font-weight="bold" text-anchor="start">4 · Client names</text>
+<text x="514" y="416" font-size="12.5" fill="#333" text-anchor="start">one static stand-in · variants auto-derived</text>
+<text x="700" y="438" font-size="13.5" fill="#555" font-style="italic" text-anchor="middle">Pass order avoids mangling: networks, IB, hosts, names.</text>
+<line x1="935" y1="295" x2="1000" y2="295" stroke="#444" stroke-width="2.5"/>
+<polygon points="1010,295 998,289 998,301" fill="#444"/>
+<text x="972" y="281" font-size="13" fill="#555" font-style="italic" text-anchor="middle">LEAK scan</text>
+<rect x="1010" y="130" width="350" height="330" rx="10" fill="#eafaf1" stroke="#1e8449" stroke-width="2"/>
+<text x="1185" y="168" font-size="16" fill="#145a32" font-weight="bold" text-anchor="middle">ANONYMIZED BUNDLE</text>
+<text x="1035" y="215" font-size="15" fill="#222" text-anchor="start">•  Role-based names only</text>
+<text x="1035" y="249" font-size="15" fill="#222" text-anchor="start">•  example.internal domains</text>
+<text x="1035" y="283" font-size="15" fill="#222" text-anchor="start">•  Sequential example networks</text>
+<text x="1035" y="317" font-size="15" fill="#222" text-anchor="start">•  Same structure, same truth</text>
+<text x="1035" y="351" font-size="15" fill="#222" text-anchor="start">•  Surviving names print as LEAKs</text>
+<text x="1035" y="420" font-size="14" fill="#666" font-style="italic" text-anchor="start">Safe to share — feeds</text>
+<text x="1035" y="442" font-size="14" fill="#666" font-style="italic" text-anchor="start">Mimir&#x27;s Manual and the world.</text>
+<rect x="40" y="510" width="650" height="110" rx="10" fill="#fef9e7" stroke="#b7950b" stroke-width="2"/>
+<text x="65" y="548" font-size="16" fill="#7d6608" font-weight="bold" text-anchor="start">⚠  anonymize-map.json stays home</text>
+<text x="65" y="578" font-size="14.5" fill="#333" text-anchor="start">It maps every old value to its replacement — it contains the</text>
+<text x="65" y="602" font-size="14.5" fill="#333" text-anchor="start">REAL names. Never commit it (gitignored for a reason).</text>
+<rect x="720" y="510" width="640" height="110" rx="10" fill="#eef2f7" stroke="#2e4053" stroke-width="2"/>
+<text x="745" y="548" font-size="16" fill="#1b2631" font-weight="bold" text-anchor="start">Local and read-only by design</text>
+<text x="745" y="578" font-size="14.5" fill="#333" text-anchor="start">The source bundle is only ever read — nothing is edited in</text>
+<text x="745" y="602" font-size="14.5" fill="#333" text-anchor="start">place. Binary attachments are skipped: scrub those by hand.</text>
+<text x="700" y="690" font-size="15" fill="#555" font-style="italic" text-anchor="middle">One way through, on purpose: what crosses the veil is the knowledge — never the customer.</text>
+</svg>
